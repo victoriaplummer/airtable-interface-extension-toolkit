@@ -447,6 +447,113 @@ await table.updateRecordAsync(record, {
 
 ---
 
+## Linked Record Pill Pattern
+
+Linked record fields should **always** render as clickable pills, not plain text. This matches Airtable's native UX and helps users understand data relationships at a glance.
+
+```tsx
+export function LinkedRecordPills({value, records, className = ''}) {
+    if (!value || !Array.isArray(value) || value.length === 0) return null;
+    return (
+        <span className={`inline-flex flex-wrap gap-1 ${className}`}>
+            {value.map(link => {
+                const fullRecord = records?.find(r => r.id === link.id);
+                if (fullRecord) {
+                    return (
+                        <button
+                            key={link.id}
+                            onClick={e => { e.stopPropagation(); expandRecord(fullRecord); }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
+                                bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-pointer transition-colors"
+                            title={`Open ${link.name}`}
+                        >
+                            {link.name}
+                        </button>
+                    );
+                }
+                return (
+                    <span key={link.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                        {link.name}
+                    </span>
+                );
+            })}
+        </span>
+    );
+}
+```
+
+**Rules:**
+1. **Always use pills for linked records.** Plain text loses the relationship context Airtable users expect.
+2. **Use raw `getCellValue()` not `getCellValueAsString()`** -- you need the `[{id, name}]` array for rendering and record lookup.
+3. **Pass the loaded records array** for the linked table so pills can call `expandRecord()`. If records aren't available, render as a static gray pill.
+4. **Always `e.stopPropagation()`** on click -- pills are often nested inside other clickable elements.
+
+---
+
+## Inline Field Editing Pattern
+
+When exposing editable fields, **always read field options from the schema** -- never hardcode dropdown values.
+
+### Reading field metadata
+
+```tsx
+function getFieldMeta(table, fieldId) {
+    if (!table) return {choices: [], type: null};
+    try {
+        const field = table.getFieldByIdIfExists(fieldId);
+        if (!field) return {choices: [], type: null};
+        const choices = field.options?.choices?.map(c => c.name) || [];
+        return {choices, type: field.type};
+    } catch {}
+    return {choices: [], type: null};
+}
+
+// Memoize per table
+const statusMeta = useMemo(() => getFieldMeta(contentTable, FIELDS.STATUS), [contentTable]);
+```
+
+### Smart inline editor
+
+Render a dropdown for select fields, click-to-edit text for text fields:
+
+```tsx
+function InlineFieldEdit({label, value, fieldMeta, onSave, disabled}) {
+    if (fieldMeta.choices.length > 0) {
+        return (
+            <div>
+                <label>{label}</label>
+                <select value={value} onChange={e => onSave(e.target.value)} disabled={disabled}>
+                    <option value="">--</option>
+                    {fieldMeta.choices.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+            </div>
+        );
+    }
+    return <input value={value} onChange={e => onSave(e.target.value)} disabled={disabled} />;
+}
+```
+
+### Write values by field type
+
+```tsx
+// Single select -> {name: 'Option'} or null to clear
+onSave={val => updateField(record, FIELDS.STATUS, val ? {name: val} : null)}
+
+// Text field -> plain string or null
+onSave={val => updateField(record, FIELDS.NOTES, val || null)}
+
+// Number -> number or null
+onSave={val => updateField(record, FIELDS.SCORE, val ? Number(val) : null)}
+```
+
+**Rules:**
+1. **Never hardcode select options.** Always use `field.options.choices` from the schema.
+2. **Always permission-check before writing.** Use `table.checkPermissionsForUpdateRecord()`.
+3. **Memoize field metadata.** `useMemo(() => getFieldMeta(...), [table])` -- field schema doesn't change within a render cycle.
+4. **Handle missing fields gracefully.** `getFieldByIdIfExists` returns null if the field isn't exposed. Degrade to read-only or hidden.
+
+---
+
 ## Custom Properties for Builders
 
 Custom properties appear in the Interface Designer sidebar. Builders configure them without code.
@@ -825,3 +932,36 @@ During development, click the `</>  Develop` button in the properties panel to l
 13. **Not filling the container.** Extensions should use the full width and height of their container by default. Use `position: fixed; inset: 0` or `width: 100%; height: 100vh` on the root element. The extension can scroll if content overflows.
 
 14. **Using throwing field/table getters.** Prefer `getFieldIfExists()` and `getTableByIdIfExists()` over `getField()`, `getFieldByName()`, `getFieldById()` — the throwing variants crash if a field was deleted or isn't visible.
+
+---
+
+## Debug Panel Pattern
+
+Interface Extensions only expose tables and fields that the builder has explicitly added as data sources. This is the #1 cause of "field not found" / blank data issues. A debug panel controlled by a custom property toggle is essential during development.
+
+### Setup: boolean custom property
+
+```tsx
+{key: 'showDebug', label: 'Show Debug Panel', type: 'boolean', defaultValue: false},
+```
+
+Then gate rendering:
+```tsx
+const showDebug = customPropertyValueByKey.showDebug;
+{showDebug && <DebugPanel base={base} tables={tables} data={data} />}
+```
+
+### What the debug panel should show
+
+For each table your extension uses:
+
+1. **Resolution status** -- is the table resolved from custom properties? If not, the builder hasn't picked it yet.
+2. **Record count** -- confirms data is loading (`0` vs `null` distinguishes "empty table" from "not connected").
+3. **Available fields** -- `table.fields.map(f => ({id: f.id, name: f.name, type: f.type}))`. Fields NOT in this list will silently return `null`/throw from `getCellValue`.
+4. **Missing field validation** -- compare your expected field ID map against `table.fields`. Highlight missing IDs so the builder knows which fields to add as data sources.
+5. **Write permissions** -- `table.hasPermissionToCreateRecord()`.
+6. **Sample record probe** -- for the first record, try `getCellValueAsString(fieldId)` for every expected field. Catch errors and display them.
+
+### Key insight
+
+The Interface SDK silently fails for unconfigured fields -- `getCellValue` throws, `getCellValueAsString` may throw or return empty. The debug panel makes this visible. **Always include one during development**, then hide it behind the boolean toggle for production.

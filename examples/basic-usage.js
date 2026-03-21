@@ -21,7 +21,7 @@ import {
     LinkedSection,
     Badge,
     AttachmentPreview,
-} from 'airtable-extension-toolkit';
+} from '../frontend';
 
 // Field IDs — replace with your own
 const FIELDS = {

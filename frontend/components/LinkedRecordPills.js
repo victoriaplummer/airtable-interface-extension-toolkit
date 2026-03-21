@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useMemo} from 'react';
 
 /**
  * Renders linked record values as clickable pills that open the record detail.
@@ -63,5 +63,99 @@ export function LinkedSection({ label, value, records, onExpand }) {
             <label className="block text-xs font-medium text-gray-gray400 mb-1">{label}</label>
             <LinkedRecordPills value={value} records={records} onExpand={onExpand} />
         </div>
+    );
+}
+
+/**
+ * LinkedRecordPills with an inline "+" button that opens a searchable dropdown
+ * to add new linked records. Handles the append pattern automatically.
+ *
+ * Props:
+ *   value          - Raw getCellValue() result: Array<{id, name}>
+ *   records        - Loaded records from the linked table (for pill rendering/expand)
+ *   allRecords     - All records in the linked table (for the dropdown options).
+ *                    Usually the same as `records`. Pass separately if `records` is filtered.
+ *   onExpand       - Called with the full record when a pill is clicked.
+ *   onAdd          - Called with (recordId) when a record is selected from the dropdown.
+ *                    The caller is responsible for the actual update (append pattern).
+ *                    If null, the "+" button is not shown.
+ *   className      - Wrapper className
+ *   pillClassName  - Override clickable pill classes
+ *   fallbackClassName - Override non-clickable pill classes
+ */
+export function LinkedPillsWithAdd({
+    value,
+    records,
+    allRecords,
+    onExpand,
+    onAdd,
+    className = '',
+    pillClassName,
+    fallbackClassName,
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const linkedIds = useMemo(() => new Set((value || []).map(v => v.id)), [value]);
+    const available = useMemo(() => {
+        if (!allRecords) return [];
+        return allRecords.filter(r => !linkedIds.has(r.id));
+    }, [allRecords, linkedIds]);
+    const filtered = useMemo(() => {
+        if (!search) return available;
+        const q = search.toLowerCase();
+        return available.filter(r => r.name.toLowerCase().includes(q));
+    }, [available, search]);
+
+    return (
+        <span className={`flex flex-wrap gap-1 items-center ${className}`}>
+            <LinkedRecordPills
+                value={value}
+                records={records}
+                onExpand={onExpand}
+                pillClassName={pillClassName}
+                fallbackClassName={fallbackClassName}
+            />
+            {onAdd && (
+                <span className="relative">
+                    <button
+                        onClick={() => { setOpen(!open); setSearch(''); }}
+                        className="inline-flex items-center justify-center w-6 h-6 rounded bg-gray-gray75 dark:bg-gray-gray700 text-gray-gray400 hover:bg-blue-blueLight2 hover:text-blue-blueDark1 dark:hover:bg-blue-blueDark1/20 dark:hover:text-blue-blueLight1 text-xs transition-colors"
+                        title="Add"
+                    >
+                        +
+                    </button>
+                    {open && (
+                        <div className="absolute top-full left-0 mt-1 z-50 w-52 bg-white dark:bg-gray-gray800 rounded-lg border border-gray-gray100 dark:border-gray-gray700 shadow-lg overflow-hidden">
+                            <div className="p-1.5">
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Search..."
+                                    autoFocus
+                                    className="w-full text-xs bg-gray-gray25 dark:bg-gray-gray700 rounded px-2 py-1 border border-gray-gray100 dark:border-gray-gray600 focus:outline-none focus:border-blue-blue"
+                                />
+                            </div>
+                            <div className="max-h-40 overflow-y-auto">
+                                {filtered.length === 0 ? (
+                                    <div className="px-3 py-2 text-xs text-gray-gray400">No options</div>
+                                ) : (
+                                    filtered.map(r => (
+                                        <button
+                                            key={r.id}
+                                            onClick={() => { onAdd(r.id); setOpen(false); }}
+                                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-blueLight3 dark:hover:bg-blue-blueDark1/10 transition-colors truncate"
+                                        >
+                                            {r.name}
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </span>
+            )}
+        </span>
     );
 }

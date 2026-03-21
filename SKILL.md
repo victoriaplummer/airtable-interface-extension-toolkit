@@ -493,6 +493,43 @@ export function LinkedRecordPills({value, records, className = ''}) {
 3. **Pass the loaded records array** for the linked table so pills can call `expandRecord()`. If records aren't available, render as a static gray pill.
 4. **Always `e.stopPropagation()`** on click -- pills are often nested inside other clickable elements.
 
+### Inline Add — `LinkedPillsWithAdd`
+
+Extend pills with a `+` button that opens a searchable dropdown to link additional records without leaving the extension. The dropdown filters out already-linked records and supports type-ahead search.
+
+```tsx
+import {LinkedPillsWithAdd} from './components/LinkedRecordPills';
+
+// Helper: append a linked record (respects the array overwrite pattern)
+const appendLinkedRecord = useCallback(async (record, fieldId, newId) => {
+    const existing = record.getCellValue(fieldId) || [];
+    await table.updateRecordAsync(record, {
+        [fieldId]: [...existing.map(link => ({id: link.id})), {id: newId}],
+    });
+}, [table]);
+
+// In render:
+<LinkedPillsWithAdd
+    value={record.getCellValue(FIELDS.BRANDS)}
+    records={brands}
+    allRecords={brands}
+    onExpand={expandRecord}
+    onAdd={id => appendLinkedRecord(record, FIELDS.BRANDS, id)}
+/>
+```
+
+**Props:**
+- `value` — raw `getCellValue()` result (`[{id, name}]`)
+- `records` — loaded records for pill rendering and expand
+- `allRecords` — all records in the linked table for dropdown options (usually same as `records`)
+- `onExpand` — called with full record on pill click (pass `expandRecord`)
+- `onAdd` — called with `recordId` on selection. Caller handles the update. If null, `+` button hidden.
+
+**Rules:**
+1. **Always use the append pattern in `onAdd`.** Linked record fields overwrite — spread existing values.
+2. **Filter already-linked records out** — `LinkedPillsWithAdd` does this automatically using the `value` prop.
+3. **Permission-check before writing** — wrap `onAdd` handler with `checkPermissionsForUpdateRecord`.
+
 ---
 
 ## Inline Field Editing Pattern

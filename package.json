@@ -1,0 +1,28 @@
+{
+  "name": "airtable-extension-toolkit",
+  "version": "0.1.0",
+  "description": "Reusable helpers and components for Airtable Interface Extensions",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./colors": "./src/colors.js",
+    "./fields": "./src/fields.js",
+    "./components/*": "./src/components/*.js",
+    "./tailwind/airtable-preset": "./src/tailwind/airtable-preset.js"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0"
+  },
+  "license": "MIT",
+  "keywords": [
+    "airtable",
+    "interface-extensions",
+    "react",
+    "toolkit",
+    "helpers"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/victoriaplummer/airtable-extension-toolkit"
+  }
+}

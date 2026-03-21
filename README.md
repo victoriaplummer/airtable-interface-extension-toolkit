@@ -1,264 +1,84 @@
-# airtable-extension-toolkit
+# Airtable Custom Interface Extensions — AI Reference
 
-Reusable helpers and React components for building [Airtable Interface Extensions](https://airtable.com/developers/extensions). Handles the patterns every extension needs — safe field access, dynamic select colors from schema, inline editing, linked record pills, and Airtable's full design token system.
+A reference document that lets you co-build [Airtable Custom Interface Extensions](https://airtable.com/developers/interface-extensions) with Claude (or any AI coding assistant). Describe what you want, get working code.
 
-## Installation
+## Why this exists
 
-Copy the `src/` folder into your extension project, or install via npm:
+Airtable's Custom Interface Extensions let you build dashboards, forms, charts, and interactive tools that live right inside your Airtable workspace. They're incredibly powerful — but they require React code, which puts them out of reach for most Airtable builders.
 
-```bash
-npm install airtable-extension-toolkit
-```
+This document bridges the gap. Upload one file to Claude Projects and you can describe interfaces in plain English — *"show my tasks in a kanban board grouped by status"* — and get working extension code back.
 
-## Quick Start
+## What's inside
 
-```jsx
-import { getFieldString, getSelectChoices, Badge, EditableSection } from 'airtable-extension-toolkit';
+**`SKILL.md`** teaches your AI assistant the entire Interface Extensions SDK:
 
-// Read a field safely (returns '' if field is missing)
-const status = getFieldString(record, 'fldXXX');
+- **Getting started** — project scaffold, CLI setup, how to run and release
+- **Reading data** — tables, records, fields, multi-table patterns with configurable properties
+- **Writing data** — creating, updating, deleting records with proper permission handling
+- **Styling** — Tailwind CSS with Airtable design tokens, plain CSS, dark mode support
+- **Builder settings** — configurable properties so your team can customize without touching code
+- **Charts & visualizations** — D3, Recharts, and other npm packages that work out of the box
+- **Every field type** — read/write formats for all 25+ Airtable field types (selects, linked records, attachments, dates, checkboxes, etc.)
+- **Limits & best practices** — batch sizes, rate limits, common pitfalls to avoid
+- **Official examples** — all 8 Airtable example repos with what each demonstrates
 
-// Read select field colors from Airtable schema — never hardcode these
-const statusChoices = getSelectChoices(campaignsTable, 'fldXXX');
-const match = statusChoices.find(c => c.name === status);
-<Badge text={status} colors={match?.styles} />
+## How to use
 
-// Click-to-edit text field (automatically read-only for aiText, formula, etc.)
-<EditableSection
-    label="Description"
-    value={description}
-    onSave={isWritableTextField(table, fieldId) ? (val => updateField(record, fieldId, val)) : null}
-/>
-```
+### Claude Projects (claude.ai)
 
-See [`examples/basic-usage.js`](examples/basic-usage.js) for a complete working extension.
+1. Open your Claude Project
+2. Go to **Project Knowledge**
+3. Upload `SKILL.md`
+4. Start describing the interface you want to build
 
-## Claude Code Skill
+### Claude Code (CLI)
 
-The `skill/SKILL.md` file is a Claude Code skill that teaches AI how to build Airtable Interface Extensions correctly. To install:
+Copy `SKILL.md` into your project's `.claude/` directory:
 
 ```bash
-cp skill/SKILL.md your-project/.claude/skills/airtable-extensions/SKILL.md
+mkdir -p .claude
+cp SKILL.md .claude/airtable-interface-extensions.md
 ```
 
-Claude Code will automatically pick it up when working in your project.
+Claude Code will automatically include it as context.
 
----
+### Cursor
 
-## API Reference
+This repo includes a Cursor rules file at `.cursor/rules/interface-extensions.mdc`. Copy the `.cursor` directory into your extension project:
 
-### Field Helpers (`fields.js`)
-
-#### `getField(record, fieldId) → any | null`
-
-Safe wrapper around `record.getCellValue()`. Returns `null` if the field is missing, not exposed, or throws. Use for linked records, attachments, selects — anywhere you need the raw object.
-
-#### `getFieldString(record, fieldId) → string`
-
-Safe wrapper around `record.getCellValueAsString()`. Returns `''` on error. Use for text, dates, numbers — anything rendered as plain text.
-
-#### `isWritableTextField(table, fieldId) → boolean`
-
-Returns `true` if the field is a writable text type (`singleLineText`, `multilineText`, `richText`, `email`, `url`, `phoneNumber`). Returns `false` for `aiText`, formulas, lookups, and other computed types. Use to gate inline editing.
-
-#### `getFieldMeta(table, fieldId) → {choices: string[], type: string|null}`
-
-Reads field metadata from the table schema. `choices` is populated for single/multi select fields. Use to build dynamic dropdown UIs.
-
-#### `getSelectChoices(table, fieldId, options?) → Array<{name, styles}>`
-
-Reads select field choices with their Airtable colors resolved to style values.
-
-```jsx
-const choices = getSelectChoices(table, fieldId);
-// → [{name: 'Draft', styles: {bg: '...', text: '...', header: '...', dot: '...', border: '...', dropActive: '...'}}, ...]
-
-// Raw RGB mode for non-Tailwind projects:
-const choices = getSelectChoices(table, fieldId, { mode: 'raw' });
-// → [{name: 'Draft', styles: {bg: 'rgb(209, 226, 255)', text: 'rgb(13, 82, 172)', ...}}, ...]
+```bash
+cp -r .cursor/ your-extension-project/.cursor/
 ```
 
----
+Cursor will automatically apply the rules when editing files in your extension.
 
-### Color System (`colors.js`)
+### Other AI tools
 
-Airtable select options have a `color` property like `'blueBright'`, `'greenLight2'`, etc. This module maps those to usable styles.
+The document is model-agnostic markdown. Add it to any system prompt, RAG pipeline, or knowledge base where you want an AI to write Airtable Interface Extension code.
 
-#### `airtableColorStyles(color) → {bg, text, header, dot, border, dropActive}`
+## Sources
 
-Returns Tailwind class strings. Requires the [Airtable Tailwind preset](#tailwind-preset).
+Built from the **official Airtable documentation**:
 
-```jsx
-const styles = airtableColorStyles('blueBright');
-// → {bg: 'bg-blue-blueLight2 dark:bg-blue-blueDark1/30', text: 'text-blue-blueDark1 dark:text-blue-blueLight1', ...}
-```
+| Source | What was extracted |
+|--------|--------------------|
+| [Getting Started Guide](https://airtable.com/developers/interface-extensions/guides/getting-started) | CLI setup, prerequisites |
+| [Hello World Tutorial](https://airtable.com/developers/interface-extensions/guides/hello-world-tutorial) | Project scaffold, development mode |
+| [Read Data Guide](https://airtable.com/developers/interface-extensions/guides/read-data-from-airtable) | Reading tables, records, multi-table patterns |
+| [Write Data Guide](https://airtable.com/developers/interface-extensions/guides/write-back-to-airtable) | CRUD operations, permissions, batch limits, linked records |
+| [Custom Properties Guide](https://airtable.com/developers/interface-extensions/guides/builders-custom-properties) | Builder-configurable settings |
+| [Dark Mode Guide](https://airtable.com/developers/interface-extensions/guides/dark-mode) | CSS and JS approaches |
+| [Full API Reference](https://airtable.com/developers/interface-extensions/api) | All models, hooks, components, utils, field types |
+| [Airtable GitHub org](https://github.com/orgs/Airtable/repositories) | 8 example extension repos, source code patterns |
 
-#### `airtableColorValues(color) → {bg, text, header, dot, border, dropActive}`
+## Acknowledgments
 
-Returns raw RGB strings. Use with inline styles or non-Tailwind projects.
+- Airtable's [word-cloud extension](https://github.com/Airtable/interface-extensions-word-cloud-typescript) was used to confirm npm package compatibility (D3), CSS patterns, and dark mode implementation.
+- The Tailwind CSS setup guide was made possible by [@nabong04](https://github.com/nabong04)'s [airtable-geocoded-locations-map](https://github.com/nabong04/airtable-geocoded-locations-map) — a community-built extension with a complete Airtable design token mapping for Tailwind.
 
-```jsx
-const styles = airtableColorValues('blueBright');
-// → {bg: 'rgb(209, 226, 255)', text: 'rgb(13, 82, 172)', ...}
-```
+## Contributing
 
-#### `createColorResolver(mode) → function`
-
-Factory for custom output modes. `mode` is `'tailwind'` (default), `'raw'`, or `'both'`.
-
-```jsx
-const resolve = createColorResolver('both');
-const styles = resolve('greenLight2');
-// → {bg: {class: 'bg-green-greenLight2 ...', value: 'rgb(207, 245, 209)'}, ...}
-```
-
-#### Exports: `AT_COLOR_FAMILY`, `AT_COLORS_RAW`, `TAILWIND_STYLES`
-
-Raw data tables if you need to build your own resolver.
-
----
-
-### Components
-
-#### `<Badge text colors className />`
-
-Colored status pill.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `text` | string | Badge label |
-| `colors` | `{bg, text}` | From `airtableColorStyles()` or `getSelectChoices().styles` |
-
-#### `<LinkedRecordPills value records onExpand className />`
-
-Clickable linked record chips matching Airtable's native style.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `value` | `Array<{id, name}>` | Raw `getCellValue()` result from a linked record field |
-| `records` | `Array<Record>` | Loaded records from the linked table |
-| `onExpand` | `(record) => void` | Called when pill is clicked. Pass `expandRecord` from the Airtable SDK. |
-
-```jsx
-import { expandRecord } from '@airtable/blocks/interface/ui';
-<LinkedRecordPills value={brandLinks} records={brands} onExpand={expandRecord} />
-```
-
-#### `<LinkedSection label value records onExpand />`
-
-Label + `LinkedRecordPills` wrapper. Returns null if value is empty.
-
-#### `<EditableText value onSave multiline placeholder hideWhenEmpty renderDisplay />`
-
-Core click-to-edit primitive. When `onSave` is null, renders as read-only.
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `value` | string | | Current value |
-| `onSave` | `(val) => void` | null | Save callback. Null = read-only. |
-| `multiline` | boolean | false | Textarea vs input |
-| `placeholder` | string | 'Click to edit' | Empty state text |
-| `hideWhenEmpty` | boolean | false | Return null when empty |
-| `renderDisplay` | `(val) => ReactNode` | | Custom display renderer |
-| `rows` | number | 4 | Textarea rows |
-
-#### `<EditableSection label value onSave labelStyle placeholder renderDisplay />`
-
-Labeled wrapper around `EditableText`. Includes presets:
-
-- **`<FormSection />`** — `labelStyle="default"` (small gray label)
-- **`<BibleSection />`** — `labelStyle="uppercase"` (uppercase tracking label)
-- **`<AIOutputSection />`** — `labelStyle="heading"` (semibold heading label, 8-row textarea)
-
-#### `<InlineFieldEdit label value fieldMeta onSave disabled />`
-
-Smart field editor — dropdown for select fields, click-to-edit text for text fields.
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `fieldMeta` | `{choices, type}` | From `getFieldMeta()` |
-| `onSave` | `(val) => void` | Receives the raw string value |
-
-#### `<AttachmentPreview attachments className index />`
-
-Renders a thumbnail from an Airtable attachment field.
-
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `attachments` | Array | | From `getCellValue()` on an attachment field |
-| `index` | number | 0 | Which attachment to show |
-
-#### `<Markdown className>{children}</Markdown>`
-
-Zero-dependency Markdown renderer. Falls back to plain whitespace-pre-wrap text if content doesn't contain Markdown syntax. Supports headings, bold/italic, lists, blockquotes, code blocks, and links.
-
----
-
-### Tailwind Preset
-
-The toolkit includes a complete Tailwind CSS preset with Airtable's design tokens (colors, typography, spacing, shadows, border-radius). Required for any component that uses Tailwind class names.
-
-```js
-// tailwind.config.js
-const airtablePreset = require('airtable-extension-toolkit/tailwind/airtable-preset');
-
-module.exports = {
-    presets: [airtablePreset],
-    content: ['./frontend/**/*.{js,jsx}'],
-    // your overrides...
-};
-```
-
-If you're not using Tailwind, use the `'raw'` color mode to get RGB values for inline styles:
-
-```jsx
-const choices = getSelectChoices(table, fieldId, { mode: 'raw' });
-<div style={{ backgroundColor: choices[0].styles.bg, color: choices[0].styles.text }}>
-    {choices[0].name}
-</div>
-```
-
----
-
-## Airtable Color Families
-
-The 10 Airtable color families and their token names:
-
-| Family | Tokens |
-|--------|--------|
-| blue | `blueBright`, `blueLight1`, `blueLight2`, `blueDark1` |
-| cyan | `cyanBright`, `cyanLight1`, `cyanLight2`, `cyanDark1` |
-| teal | `tealBright`, `tealLight1`, `tealLight2`, `tealDark1` |
-| green | `greenBright`, `greenLight1`, `greenLight2`, `greenDark1` |
-| yellow | `yellowBright`, `yellowLight1`, `yellowLight2`, `yellowDark1` |
-| orange | `orangeBright`, `orangeLight1`, `orangeLight2`, `orangeDark1` |
-| red | `redBright`, `redLight1`, `redLight2`, `redDark1` |
-| pink | `pinkBright`, `pinkLight1`, `pinkLight2`, `pinkDark1` |
-| purple | `purpleBright`, `purpleLight1`, `purpleLight2`, `purpleDark1` |
-| gray | `grayBright`, `grayLight1`, `grayLight2`, `grayDark1` |
-
-All tokens within a family resolve to the same style bundle. For example, `blueBright` and `blueLight2` both produce blue-family styles.
-
----
-
-## Writable vs Read-Only Field Types
-
-`isWritableTextField()` returns `true` for:
-
-| Type | Write format |
-|------|-------------|
-| `singleLineText` | `string` |
-| `multilineText` | `string` |
-| `richText` | `string` (Markdown) |
-| `email` | `string` |
-| `url` | `string` |
-| `phoneNumber` | `string` |
-
-Returns `false` for `aiText`, `formula`, `rollup`, `count`, `lookup`, `autoNumber`, `createdTime`, `lastModifiedTime`, `createdBy`, `lastModifiedBy`, `button`, `externalSyncSource`, and all other computed types.
-
-For select fields, use `{name: 'Option'}` as the write value, not a plain string.
-
----
+Found an error or want to add a pattern? PRs welcome. The goal is to keep this as the single best reference for building Airtable Interface Extensions with AI.
 
 ## License
 

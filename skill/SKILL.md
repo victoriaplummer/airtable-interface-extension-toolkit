@@ -46,7 +46,7 @@ import {
 } from '@airtable/blocks/interface/ui';
 ```
 
-There is NO Airtable UI component library. No `<Button>`, `<Input>`, `<Select>` from Airtable. You use plain React + your own CSS. The only provided component is `<CellRenderer>`.
+There is NO Airtable-provided UI component library beyond `<CellRenderer>`. For buttons, inputs, selects, dialogs, etc., use a third-party library like **MUI** (Material UI — used in Airtable's own sliding-bar-chart example) or plain HTML/React elements. See the Styling & External Libraries section for options.
 
 ### Old Blocks SDK vs New Interface Extensions SDK
 
@@ -74,9 +74,15 @@ The blocks CLI uses webpack. Any npm package compatible with webpack works. Inst
 |------|-------------|-------|
 | **Charts** | `recharts` (React), `d3` + `d3-cloud` | Airtable's official word-cloud example uses D3. Recharts is easier for standard charts. |
 | **Date handling** | `date-fns` or `dayjs` | Lighter than moment.js. Date fields return ISO 8601 strings. |
-| **Headless UI** | `@radix-ui/react-*` | Accessible primitives (dialogs, dropdowns, tooltips) without styling opinions. |
-| **Icons** | `lucide-react` or `react-icons` | No Airtable icon library is provided. |
-| **CSS framework** | Plain CSS with `prefers-color-scheme` | See below for why Tailwind is difficult. |
+| **Component library** | `@mui/material` (MUI) | Airtable's own sliding-bar-chart example uses MUI v7 + Emotion. Full component set (buttons, inputs, dialogs, etc.). |
+| **Headless UI** | `@radix-ui/react-*` | Accessible primitives (dialogs, dropdowns, tooltips) without styling opinions. Lighter than MUI. |
+| **Icons** | `@phosphor-icons/react` | Append `Icon` suffix when importing: `import {ArrowRightIcon} from '@phosphor-icons/react'`. |
+| **Drag & drop** | `@dnd-kit/core` | Accessible drag-and-drop for kanban boards, sortable lists, etc. |
+| **Markdown** | `marked` | Parse markdown content from rich text or long text fields. |
+| **3D models** | `@google/model-viewer` | Render 3D models inline. |
+| **CSS framework** | Plain CSS or **Tailwind CSS** | Tailwind is officially supported — used in Airtable's own map extension. See Tailwind section below. |
+
+**React 19 note:** If a third-party library doesn't list React 19 as a peer dependency, use `npm install --legacy-peer-deps` to install it.
 
 ### CSS approach
 
@@ -101,13 +107,55 @@ loadCSSFromString(`
 `);
 ```
 
-### Why Tailwind/shadcn is difficult
+### Tailwind CSS — officially supported
 
-The blocks CLI controls the webpack config and doesn't expose it. Tailwind requires PostCSS configuration. Additionally, Tailwind's `dark:` class approach conflicts with Airtable's `prefers-color-scheme` system. If you want Tailwind, you'd need to use the CDN play build via `loadCSSFromURLAsync` — but this is heavyweight and lacks dark mode integration.
+Tailwind works with the blocks CLI. Airtable's own [map extension](https://github.com/Airtable/interface-extensions-map) uses this exact setup. The webpack bundler auto-detects PostCSS when the loaders are installed.
+
+**Setup:**
+```bash
+npm install -D tailwindcss postcss postcss-loader css-loader style-loader autoprefixer @airtable/blocks-webpack-bundler
+```
+
+**tailwind.config.js** (at project root):
+```js
+module.exports = {
+    content: ['./frontend/**/*.{js,ts,jsx,tsx}'],
+    theme: {
+        extend: {
+            colors: {
+                // Map Airtable's design tokens to Tailwind utilities
+                blue: {
+                    DEFAULT: 'rgb(22, 110, 225)',
+                    dark1: 'rgb(13, 82, 172)',
+                    light1: 'rgb(160, 198, 255)',
+                    light2: 'rgb(209, 226, 255)',
+                },
+                // Add more Airtable colors as needed — see the full token set at:
+                // github.com/nabong04/airtable-geocoded-locations-map/blob/main/tailwind.config.js
+            },
+        },
+    },
+};
+```
+
+**frontend/style.css:**
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+Then `import './style.css'` in your component. Use classes like `bg-blue-light2`, `text-gray-900`, etc.
+
+**Dark mode note:** Tailwind's `dark:` prefix uses a class-based strategy by default, which won't match Airtable's `prefers-color-scheme` system. To fix this, set `darkMode: 'media'` in your tailwind config so `dark:` classes respond to the same media query Airtable uses.
+
+**References:**
+- [Airtable/interface-extensions-map](https://github.com/Airtable/interface-extensions-map) — official Airtable example with Tailwind + TypeScript + Mapbox
+- [nabong04/airtable-geocoded-locations-map](https://github.com/nabong04/airtable-geocoded-locations-map) — community example with full Airtable design token mapping in `tailwind.config.js`
 
 ### Design tokens from Airtable
 
-Use the built-in `colors` and `colorUtils` to match Airtable's palette:
+Use the built-in `colors` and `colorUtils` to match Airtable's palette (works without Tailwind):
 
 ```tsx
 import {colors, colorUtils} from '@airtable/blocks/interface/ui';
@@ -198,10 +246,11 @@ function MyExtension() {
 
 ### Field access
 
+**Always use `getFieldIfExists`** — it returns `null` instead of throwing. The throwing variants (`getField`, `getFieldByName`, `getFieldById`) will crash your extension if a field was deleted or isn't visible.
+
 ```tsx
-const field = table.getFieldByName('Status');  // throws if not found
-const field2 = table.getFieldByNameIfExists('X'); // null if not found
-// Also: getFieldById, getFieldByIdIfExists, getField(idOrName), getFieldIfExists(idOrName)
+const field = table.getFieldIfExists('Status'); // returns Field | null
+if (!field) return <div>Please configure the Status field</div>;
 
 field.type    // FieldType enum value, e.g. 'singleSelect'
 field.name    // string
@@ -210,6 +259,19 @@ field.config  // { type, options } — useful for type narrowing
 field.isComputed    // true for formula, rollup, autoNumber, etc.
 field.isPrimaryField
 field.description   // string | null
+```
+
+**Best practice:** Don't hardcode field names. Use custom properties to let builders select fields (see Custom Properties section). Use `record.getCellValueAsString(field)` when you just need to display a value without handling each field type individually.
+
+**Always use the FieldType enum for comparisons** — never compare against string literals:
+```tsx
+import {FieldType} from '@airtable/blocks/interface/models';
+
+// ✅ CORRECT
+if (field.type === FieldType.SINGLE_SELECT) { /* ... */ }
+
+// ❌ WRONG — don't use string literals
+if (field.type === 'singleSelect') { /* ... */ }
 ```
 
 ---
@@ -432,6 +494,31 @@ function MyExtension() {
 }
 ```
 
+### API keys and credentials
+
+Use string custom properties for third-party API keys — never hardcode them:
+
+```tsx
+{key: 'mapboxApiKey', label: 'Mapbox API Key', type: 'string', defaultValue: ''},
+```
+
+### Show config instructions only when unset
+
+Only show "please configure this extension" UI when custom properties are missing values:
+
+```tsx
+function MyExtension() {
+    const {customPropertyValueByKey} = useCustomProperties(getCustomProperties);
+    const table = customPropertyValueByKey.dataTable;
+    const apiKey = customPropertyValueByKey.mapboxApiKey;
+
+    if (!table || !apiKey) {
+        return <div>Open the properties panel to configure this extension.</div>;
+    }
+    // ... render extension
+}
+```
+
 ---
 
 ## GlobalConfig (Persistent Key-Value Storage)
@@ -532,7 +619,8 @@ const runInfo = useRunInfo();
 runInfo.isDevelopmentMode       // boolean
 runInfo.isPageElementInEditMode // boolean — useful for showing config UI
 
-// Expand a record to its detail view
+// Expand a record to its detail view — PREFERRED over custom popovers/detail panes
+// Use this as the default way to show record detail (click row → expand)
 expandRecord(record); // opens Airtable's native record detail modal
 // Check first: table.hasPermissionToExpandRecords()
 
@@ -679,8 +767,9 @@ Airtable provides these example repos at `github.com/Airtable/`:
 | `interface-extensions-hello-world-typescript` | TS | TypeScript scaffold |
 | `interface-extensions-embed` | JS/TS/CSS | Inbox layout + iframe embeds, custom properties for table/field selection, CSS styling |
 | `interface-extensions-word-cloud-typescript` | TS | **D3 + d3-cloud npm packages**, `useColorScheme` for dark mode palettes, `useCustomProperties` with field filtering, `expandRecord`, `useMemo`/`useCallback` patterns |
+| `interface-extensions-map` | TS | **Tailwind CSS + Mapbox + TypeScript**, custom properties for API keys and field selection, dark mode, `expandRecord`, localStorage for view state |
 | `interface-extensions-heatmap` | — | Data visualization |
-| `interface-extensions-sliding-bar-chart` | — | Charting |
+| `interface-extensions-sliding-bar-chart` | JS | **MUI (Material UI) v7 + Emotion** for styled components, charting with sliders |
 
 The **word-cloud** example is the best reference for production patterns — it shows npm package integration, dark mode with dual color palettes, D3 rendering, and custom property configuration.
 
@@ -707,272 +796,11 @@ During development, click the `</>  Develop` button in the properties panel to l
 
 ---
 
-## Linked Record Pill Pattern
-
-Linked record fields should **always** render as clickable pills, not plain text. This matches Airtable's native UX and helps users understand data relationships at a glance.
-
-### The component
-
-```tsx
-// Shared component — export from your main entry file.
-// `value` = raw getCellValue() result: Array<{id, name}>
-// `records` = loaded records from the linked table (for expandRecord lookup)
-export function LinkedRecordPills({value, records, className = ''}) {
-    if (!value || !Array.isArray(value) || value.length === 0) return null;
-    return (
-        <span className={`inline-flex flex-wrap gap-1 ${className}`}>
-            {value.map(link => {
-                const fullRecord = records?.find(r => r.id === link.id);
-                if (fullRecord) {
-                    return (
-                        <button
-                            key={link.id}
-                            onClick={e => { e.stopPropagation(); expandRecord(fullRecord); }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium
-                                bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-pointer transition-colors"
-                            title={`Open ${link.name}`}
-                        >
-                            {link.name}
-                            <ExternalLinkIcon />
-                        </button>
-                    );
-                }
-                // Fallback — record not in loaded data (table not connected)
-                return (
-                    <span key={link.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                        {link.name}
-                    </span>
-                );
-            })}
-        </span>
-    );
-}
-```
-
-### Usage
-
-Use `getField()` (raw cell value) instead of `getFieldString()` for linked record fields:
-
-```tsx
-// ✅ Linked record — use getField + LinkedRecordPills
-const campaignLinks = getField(record, FIELDS.CAMPAIGN_BRIEF);
-<LinkedRecordPills value={campaignLinks} records={data.campaigns} />
-
-// ❌ Don't flatten to string for linked records
-const campaign = getFieldString(record, FIELDS.CAMPAIGN_BRIEF);
-<span>{campaign}</span>
-```
-
-### Rules
-
-1. **Always use pills for linked records.** Plain text loses the relationship context that Airtable users expect.
-2. **Use `getField()` not `getFieldString()`** — you need the raw `[{id, name}]` array for both rendering and record lookup.
-3. **Pass the loaded records array** for the linked table so pills can call `expandRecord()`. If records aren't available, the pill renders as a static (non-clickable) badge.
-4. **Always `e.stopPropagation()`** on click — pills are often nested inside other clickable elements (cards, accordions).
-5. **Graceful fallback** — if the linked table isn't loaded or the record isn't found, show a plain gray pill with just the name.
-
----
-
-## Inline Field Editing Pattern
-
-When exposing editable fields in your UI, **always read field options from the schema** — never hardcode dropdown values. This ensures the UI stays in sync when options are renamed, reordered, or added in Airtable.
-
-### Reading field metadata
-
-```tsx
-// Get field choices and type from the table schema
-function getFieldMeta(table, fieldId) {
-    if (!table) return {choices: [], type: null};
-    try {
-        const field = table.getFieldByIdIfExists(fieldId);
-        if (!field) return {choices: [], type: null};
-        const choices = field.options?.choices?.map(c => c.name) || [];
-        return {choices, type: field.type};
-    } catch {}
-    return {choices: [], type: null};
-}
-
-// Usage — memoize per table (field schema is stable within a render)
-const statusMeta = useMemo(() => getFieldMeta(contentTable, FIELDS.STATUS), [contentTable]);
-const approvedByMeta = useMemo(() => getFieldMeta(contentTable, FIELDS.APPROVED_BY), [contentTable]);
-```
-
-### Smart inline editor component
-
-Render a dropdown for fields with choices (single select, multi-select), a click-to-edit text input for text fields:
-
-```tsx
-function InlineFieldEdit({label, value, fieldMeta, onSave, disabled}) {
-    // Select fields → dropdown populated from schema
-    if (fieldMeta.choices.length > 0) {
-        return (
-            <div>
-                <label>{label}</label>
-                <select
-                    value={value}
-                    onChange={e => onSave(e.target.value)}
-                    disabled={disabled}
-                >
-                    <option value="">—</option>
-                    {fieldMeta.choices.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-            </div>
-        );
-    }
-
-    // Text fields → click-to-edit input
-    return <InlineTextInput label={label} value={value} onSave={onSave} disabled={disabled} />;
-}
-```
-
-### Write values by field type
-
-When saving, the value format depends on the field type:
-
-```tsx
-// Single select → {name: 'Option Name'} or null to clear
-onSave={val => updateField(record, FIELDS.STATUS, val ? {name: val} : null)}
-
-// Text field → plain string or null to clear
-onSave={val => updateField(record, FIELDS.NOTES, val || null)}
-
-// Number → number or null
-onSave={val => updateField(record, FIELDS.SCORE, val ? Number(val) : null)}
-```
-
-### Rules
-
-1. **Never hardcode select options.** Always use `field.options.choices` from the schema.
-2. **Always permission-check before writing.** Use `table.checkPermissionsForUpdateRecord()`.
-3. **Memoize field metadata.** `useMemo(() => getFieldMeta(...), [table])` — field schema doesn't change within a render cycle.
-4. **Handle missing fields gracefully.** `getFieldByIdIfExists` returns null if the field isn't exposed in Interface Designer. The component should degrade to read-only or hidden.
-
----
-
-## Debug Panel Pattern
-
-Interface Extensions only expose tables and fields that the builder has explicitly added as data sources. This is the #1 cause of "field not found" / blank data issues. A debug panel controlled by a custom property toggle is essential during development.
-
-### Setup: boolean custom property
-
-```tsx
-function getCustomProperties(base) {
-    return [
-        // ... table pickers ...
-        {key: 'showDebug', label: 'Show Debug Panel', type: 'boolean', defaultValue: false},
-    ];
-}
-```
-
-Then gate rendering in your layout:
-```tsx
-const {customPropertyValueByKey} = useCustomProperties(getCustomProperties);
-const showDebug = customPropertyValueByKey.showDebug;
-// ...
-{showDebug && <DebugPanel base={base} tables={tables} data={data} />}
-```
-
-### What the debug panel should show
-
-For each table your extension uses, display:
-
-1. **Resolution status** — is the table resolved from custom properties? If not, the builder hasn't picked it yet.
-2. **Record count** — confirms data is actually loading (`0` vs `null` distinguishes "empty table" from "table not connected").
-3. **Available fields** — `table.fields.map(f => ({id: f.id, name: f.name, type: f.type}))`. This is what the Interface Designer has exposed. Fields NOT in this list will silently return `null`/throw from `getCellValue`.
-4. **Missing field validation** — compare your expected field ID map against `table.fields`. Highlight any expected IDs that aren't in the available set. This instantly tells the builder which fields to add as data sources.
-5. **Write permissions** — `table.hasPermissionToCreateRecord()`. Shows whether the interface config allows writes.
-6. **Sample record probe** — for the first record, try `getCellValueAsString(fieldId)` for every expected field. Catch errors and display them. This reveals field ID mismatches, permission issues, and data format surprises.
-
-### Implementation pattern
-
-```tsx
-// Define your expected field maps per table
-const FIELD_MAPS = {
-    tasksTable: {label: 'Tasks', fields: {NAME: 'fldXXX', STATUS: 'fldYYY', ...}},
-    // ...
-};
-
-function DebugPanel({base, tables, data}) {
-    const [expandedTable, setExpandedTable] = useState(null);
-
-    return (
-        <div style={{margin: 16, padding: 12, background: '#fffde7', fontSize: 11, fontFamily: 'monospace', maxHeight: 400, overflow: 'auto'}}>
-            <strong>Debug Panel</strong>
-
-            {/* Base tables */}
-            <div>
-                <strong>Base tables ({base.tables.length}):</strong>
-                {base.tables.map(t => <div key={t.id}>{t.id} = {t.name}</div>)}
-            </div>
-
-            {/* Per-table diagnostics — click to expand */}
-            {Object.entries(FIELD_MAPS).map(([tableKey, {label, fields}]) => {
-                const table = tables[tableKey];
-                const records = data[tableKey.replace('Table', '') + 's']; // convention
-                const isExpanded = expandedTable === tableKey;
-
-                // Available field IDs on this table
-                const availableIds = new Set();
-                if (table) {
-                    try { table.fields.forEach(f => availableIds.add(f.id)); } catch {}
-                }
-
-                const expected = Object.entries(fields);
-                const missing = expected.filter(([, fid]) => !availableIds.has(fid));
-                const canWrite = table ? table.hasPermissionToCreateRecord() : false;
-
-                return (
-                    <div key={tableKey}>
-                        <button onClick={() => setExpandedTable(isExpanded ? null : tableKey)}>
-                            {isExpanded ? '▼' : '▶'} <strong>{label}</strong>
-                            {' '}{table ? `${records?.length ?? 0} records` : 'NOT RESOLVED'}
-                            {missing.length > 0 && ` (${missing.length} missing fields)`}
-                            {' '}{canWrite ? 'writable' : 'read-only'}
-                        </button>
-                        {isExpanded && (
-                            <div style={{marginLeft: 16}}>
-                                {/* Available fields */}
-                                {table && table.fields.map(f => (
-                                    <div key={f.id}>{f.id} = {f.name} ({f.type})</div>
-                                ))}
-                                {/* Missing fields — builder needs to add these */}
-                                {missing.length > 0 && (
-                                    <div style={{color: 'red'}}>
-                                        Missing: {missing.map(([k, fid]) => `${k}=${fid}`).join(', ')}
-                                    </div>
-                                )}
-                                {/* Sample probe */}
-                                {records?.[0] && expected.map(([key, fid]) => {
-                                    let val;
-                                    try {
-                                        val = records[0].getCellValueAsString(fid);
-                                        val = val ? val.substring(0, 60) : '(empty)';
-                                    } catch (e) {
-                                        val = 'ERROR: ' + e.message;
-                                    }
-                                    return <div key={fid}>{key}: {val}</div>;
-                                })}
-                            </div>
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-```
-
-### Key insight
-
-The Interface SDK silently fails for unconfigured fields — `getCellValue` throws, `getCellValueAsString` may throw or return empty. The debug panel makes this visible. **Always include one during development**, then hide it behind the boolean toggle for production.
-
----
-
 ## Common Mistakes to Avoid
 
 1. **Importing from wrong package.** Use `@airtable/blocks/interface/ui` and `@airtable/blocks/interface/models`. NOT `@airtable/blocks/ui` (that's the old Blocks SDK).
 
-2. **Trying to use Airtable UI components.** There is no `<Button>`, `<Input>`, `<Box>`, `<FormField>` etc. Those existed in the old Blocks SDK. Interface Extensions only provide `<CellRenderer>`. Use plain HTML/React elements.
+2. **Trying to import UI components from `@airtable/blocks`.** There is no `<Button>`, `<Input>`, `<Box>`, `<FormField>` from Airtable. Interface Extensions only provide `<CellRenderer>`. Use a third-party library like MUI (`@mui/material`) or plain HTML/React elements.
 
 3. **Forgetting permission checks before writes.** Always call `hasPermissionTo*` or `checkPermissionsFor*` before any create/update/delete. The interface designer may have disabled editing.
 
@@ -990,4 +818,10 @@ The Interface SDK silently fails for unconfigured fields — `getCellValue` thro
 
 10. **Expecting view-level access.** Interface Extensions don't expose views. Data access is table-level via `useRecords(table)`. The records returned are scoped to what Interface Designer has configured.
 
-11. **Hardcoding select field options.** Never hardcode dropdown values like `['Draft', 'In Review', 'Approved']`. Always read from `table.getFieldByIdIfExists(fieldId).options.choices`. If options are renamed or added in Airtable, hardcoded values silently break.
+11. **Comparing field.type against string literals.** Always use the `FieldType` enum: `field.type === FieldType.SINGLE_SELECT`, never `field.type === 'singleSelect'`.
+
+12. **Hardcoding field names or table names.** Use custom properties so builders can configure which fields/tables the extension uses. Names change if users rename them; IDs are stable but custom properties are best.
+
+13. **Not filling the container.** Extensions should use the full width and height of their container by default. Use `position: fixed; inset: 0` or `width: 100%; height: 100vh` on the root element. The extension can scroll if content overflows.
+
+14. **Using throwing field/table getters.** Prefer `getFieldIfExists()` and `getTableByIdIfExists()` over `getField()`, `getFieldByName()`, `getFieldById()` — the throwing variants crash if a field was deleted or isn't visible.

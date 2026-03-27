@@ -48,15 +48,7 @@ cp interface-extensions.mdc your-project/.cursor/rules/
 
 ### Using the helpers
 
-Copy `src/` into your extension project, or install via npm:
-
-```bash
-npm install airtable-extension-toolkit
-```
-
-```jsx
-import { getFieldString, getSelectChoices, Badge } from 'airtable-extension-toolkit';
-```
+Copy `src/` into your extension project. Then use the helpers in `index.js`
 
 See [`examples/basic-usage.js`](examples/basic-usage.js) for a complete working extension.
 

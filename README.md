@@ -4,7 +4,7 @@ Build [Airtable Custom Interface Extensions](https://airtable.com/developers/int
 
 ## What's in the box
 
-### AI Skill (`skill/SKILL.md`)
+### AI Skill (`SKILL.md`)
 
 A comprehensive reference that teaches AI how to build Airtable Interface Extensions correctly. Covers the entire SDK — reading data, writing data, custom properties, dark mode, every field type, styling with Tailwind or MUI, and 14 common mistakes to avoid.
 
@@ -12,7 +12,7 @@ Upload it to your AI tool of choice and describe what you want to build:
 
 > *"Build me a dashboard that shows tasks grouped by status with a bar chart of completion rates"*
 
-### Reusable Helpers (`src/`)
+### Reusable Helpers (`frontend/`)
 
 Drop-in utilities for patterns every extension needs:
 
@@ -29,14 +29,14 @@ Cursor-compatible rules file that guides the AI when editing extension code.
 
 ### With Claude Projects (claude.ai)
 
-1. Upload `skill/SKILL.md` to **Project Knowledge**
+1. Upload `SKILL.md` to **Project Knowledge**
 2. Describe the interface you want
 3. Claude writes working code using the SDK patterns
 
 ### With Claude Code (CLI)
 
 ```bash
-cp skill/SKILL.md your-project/.claude/skills/airtable-extensions/SKILL.md
+cp SKILL.md your-project/.claude/skills/airtable-extensions/SKILL.md
 ```
 
 ### With Cursor
@@ -48,9 +48,26 @@ cp interface-extensions.mdc your-project/.cursor/rules/
 
 ### Using the helpers
 
-Copy `src/` into your extension project. Then use the helpers in `index.js`
+Copy `frontend/` into your extension project. Then use the helpers in `index.js`
 
 See [`examples/basic-usage.js`](examples/basic-usage.js) for a complete working extension.
+
+## Security model
+
+Components in this toolkit render content that originates from Airtable cells, which is *not* a trusted boundary — base collaborators, automations, and AI workflows can write attack payloads into long-text fields.
+
+What the toolkit handles for you:
+
+- **`<Markdown>`** renders to React nodes (no `dangerouslySetInnerHTML`). URL schemes in links are restricted to `http:`, `https:`, and `mailto:` — `javascript:` and `data:` URLs render as plain text.
+- **`<AttachmentPreview>`** restricts `<img src>` to `http:`/`https:` and sets `referrerPolicy="no-referrer"`.
+
+What you, the consumer, are responsible for:
+
+- **Permission gating on writes.** `<InlineFieldEdit>` and the editable components call `onSave` directly; you must run `table.checkPermissionsForUpdateRecord(...)` in your `onSave` handler before calling `updateRecordAsync` (see [`examples/basic-usage.js`](examples/basic-usage.js)).
+- **Sanitizing AI-generated content.** If you render LLM output through `<Markdown>`, treat it as adversarial input — the renderer is hardened against XSS, but business-logic prompt injection is your call.
+- **Origin trust.** These components assume they run inside Airtable's extension iframe sandbox. If you embed them elsewhere, re-evaluate the threat model.
+
+Report security issues privately to the maintainer rather than via public issue.
 
 ## Acknowledgments
 

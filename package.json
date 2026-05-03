@@ -33,7 +33,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/patricktr/airtable-interface-extension-toolkit.git"
+    "url": "git+https://github.com/victoriaplummer/airtable-interface-extension-toolkit.git"
   },
   "publishConfig": {
     "access": "public"

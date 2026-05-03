@@ -2,16 +2,26 @@
   "name": "airtable-extension-toolkit",
   "version": "0.1.0",
   "description": "Reusable helpers and components for Airtable Interface Extensions",
-  "main": "src/index.js",
+  "type": "module",
+  "main": "./frontend/index.js",
   "exports": {
-    ".": "./src/index.js",
-    "./colors": "./src/colors.js",
-    "./fields": "./src/fields.js",
-    "./components/*": "./src/components/*.js",
-    "./tailwind/airtable-preset": "./src/tailwind/airtable-preset.js"
+    ".": "./frontend/index.js",
+    "./colors": "./frontend/colors.js",
+    "./fields": "./frontend/fields.js",
+    "./components/*": "./frontend/components/*.js",
+    "./tailwind/airtable-preset": "./frontend/tailwind/airtable-preset.js"
+  },
+  "files": [
+    "frontend",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
   },
   "peerDependencies": {
-    "react": ">=17.0.0"
+    "react": ">=17.0.0 <20.0.0"
   },
   "license": "MIT",
   "keywords": [
@@ -23,6 +33,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/victoriaplummer/airtable-extension-toolkit"
+    "url": "git+https://github.com/patricktr/airtable-interface-extension-toolkit.git"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

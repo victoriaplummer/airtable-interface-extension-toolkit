@@ -52,6 +52,23 @@ Copy `src/` into your extension project. Then use the helpers in `index.js`
 
 See [`examples/basic-usage.js`](examples/basic-usage.js) for a complete working extension.
 
+## Security model
+
+Components in this toolkit render content that originates from Airtable cells, which is *not* a trusted boundary — base collaborators, automations, and AI workflows can write attack payloads into long-text fields.
+
+What the toolkit handles for you:
+
+- **`<Markdown>`** renders to React nodes (no `dangerouslySetInnerHTML`). URL schemes in links are restricted to `http:`, `https:`, and `mailto:` — `javascript:` and `data:` URLs render as plain text.
+- **`<AttachmentPreview>`** restricts `<img src>` to `http:`/`https:` and sets `referrerPolicy="no-referrer"`.
+
+What you, the consumer, are responsible for:
+
+- **Permission gating on writes.** `<InlineFieldEdit>` and the editable components call `onSave` directly; you must run `table.checkPermissionsForUpdateRecord(...)` in your `onSave` handler before calling `updateRecordAsync` (see [`examples/basic-usage.js`](examples/basic-usage.js)).
+- **Sanitizing AI-generated content.** If you render LLM output through `<Markdown>`, treat it as adversarial input — the renderer is hardened against XSS, but business-logic prompt injection is your call.
+- **Origin trust.** These components assume they run inside Airtable's extension iframe sandbox. If you embed them elsewhere, re-evaluate the threat model.
+
+Report security issues privately to the maintainer rather than via public issue.
+
 ## Acknowledgments
 
 - Built from [Airtable's official documentation](https://airtable.com/developers/interface-extensions) and example repos
